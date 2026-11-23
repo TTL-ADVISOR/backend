@@ -43,10 +43,15 @@
 | 409 | `RESOURCE_BUSY` | 파싱·분석이 진행 중인 프로젝트 삭제 요청 |
 | 413 | `FILE_TOO_LARGE` | 100MB 초과 |
 | 415 | `UNSUPPORTED_FORMAT` | 확장자가 `.jsonl`, `.log`, `.txt`가 아님 (내용 검사는 하지 않음) |
+| 404 | `NOT_FOUND` | 존재하지 않는 경로 |
+| 405 | `METHOD_NOT_ALLOWED` | 지원하지 않는 HTTP 메서드 |
+| 500 | `INTERNAL_ERROR` | 서버 오류 (내부 메시지는 노출하지 않음) |
+| 503 | `SERVER_BUSY` | 파싱·분석 작업 큐가 가득 참. 잠시 후 재시도 |
+
+`details`는 추가 정보가 없으면 빈 객체 `{}`다.
 
 > 파일 **내용**의 형식 오류와 100만 줄 초과는 업로드 요청 시점에 알 수 없으므로 HTTP 에러가 아니라,
 > 업로드 상태를 `FAILED`로 바꾸고 `failureReason`에 사유를 담는다 (2-3 참고).
-| 500 | `INTERNAL_ERROR` | 서버 오류 |
 
 ---
 
