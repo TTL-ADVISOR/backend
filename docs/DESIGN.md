@@ -226,7 +226,7 @@ GET    /api/analyses/{analysisId}/export           추천 설정 내보내기
 
 ## 8. 백엔드 구조
 
-- Java 21, Spring Boot 3.x, Gradle
+- Java 21, Spring Boot 4.1, Gradle 9
 - Spring Data JPA + JdbcTemplate, Flyway, MySQL Connector/J
 - 테스트: `TtlSimulator`/`TtlRecommender` 단위 테스트, Testcontainers(MySQL) 통합 테스트
 

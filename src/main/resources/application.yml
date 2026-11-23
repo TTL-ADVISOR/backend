@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: ttl-advisor
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:ttl_advisor}?serverTimezone=UTC&rewriteBatchedStatements=true
+    username: ${DB_USERNAME:ttl}
+    password: ${DB_PASSWORD:ttl}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+
+server:
+  port: ${SERVER_PORT:8080}
