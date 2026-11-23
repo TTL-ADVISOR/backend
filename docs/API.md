@@ -97,7 +97,7 @@
 
 `GET /api/projects/{projectId}`
 
-**200 OK** — 1-2의 항목과 같은 형식
+**200 OK** — 1-2의 항목과 같은 형식. `latestAnalysisId`는 상태와 관계없이 가장 최근 분석, 없으면 `null`
 
 ### 1-4. 프로젝트 삭제
 
@@ -105,7 +105,7 @@
 
 **204 No Content** — 하위 정책·업로드·요청 로그·분석 결과까지 모두 삭제 (요청 로그는 서버에서 배치 삭제)
 
-**409** `RESOURCE_BUSY` — 상태가 `PARSING`인 업로드나 `PENDING`/`RUNNING`인 분석이 있을 때
+**409** `RESOURCE_BUSY` — 상태가 `UPLOADED`(파싱 대기)/`PARSING`인 업로드나 `PENDING`/`RUNNING`인 분석이 있을 때
 
 ---
 
