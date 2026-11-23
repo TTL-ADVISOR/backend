@@ -202,6 +202,8 @@ erDiagram
 - 업로드 1회 제한: 100MB(동기 검사, 413) / 100만 줄(파싱 중 검사, 초과 시 `FAILED`)
 - 삭제: 프로젝트 삭제 시 요청 로그는 `upload_id` 단위로 1만 건씩 배치 삭제한다 (FK 연쇄 삭제에 의존하지 않음).
   파싱·분석이 진행 중인 프로젝트는 삭제할 수 없다 (409)
+- FK 규칙: `request_log → log_upload`만 CASCADE 없음(대량 연쇄 삭제 방지, 먼저 지우지 않으면 삭제 실패). 나머지 FK는 `ON DELETE CASCADE`
+- `request_log`는 JPA 엔티티를 두지 않는다 (JdbcTemplate 전용)
 
 ## 7. REST API
 
