@@ -1,16 +1,16 @@
 package com.ttladvisor;
 
+import com.ttladvisor.analysis.domain.entity.Analysis;
+import com.ttladvisor.analysis.domain.entity.EndpointResult;
+import com.ttladvisor.analysis.domain.entity.TtlSimPoint;
+import com.ttladvisor.analysis.domain.enums.Verdict;
+import com.ttladvisor.project.domain.entity.EndpointPolicy;
+import com.ttladvisor.project.domain.entity.Project;
+import com.ttladvisor.upload.domain.entity.LogUpload;
+import com.ttladvisor.upload.domain.enums.UploadStatus;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.ttladvisor.analysis.domain.Analysis;
-import com.ttladvisor.analysis.domain.EndpointResult;
-import com.ttladvisor.analysis.domain.TtlSimPoint;
-import com.ttladvisor.analysis.domain.Verdict;
-import com.ttladvisor.ingest.domain.LogUpload;
-import com.ttladvisor.ingest.domain.UploadStatus;
-import com.ttladvisor.project.domain.EndpointPolicy;
-import com.ttladvisor.project.domain.Project;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.List;
