@@ -1,6 +1,6 @@
 package com.ttladvisor.project.repository;
 
-import com.ttladvisor.project.domain.Project;
+import com.ttladvisor.project.domain.entity.Project;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;

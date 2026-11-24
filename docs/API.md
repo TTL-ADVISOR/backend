@@ -10,7 +10,8 @@
 | 시각 | ISO-8601 UTC, 밀리초 포함 (`2026-11-23T10:00:00.123Z`) |
 | 비율 | 0~1 사이 소수 (`0.87` = 87%) |
 | 시간 단위 | 필드 이름에 단위 표기 (`ttlSec`, `latencyMs`) |
-| 인증 | v1 없음 |
+| 인증 | 세션 쿠키 `SESSION`. `/api/auth/signup`, `/api/auth/login`, `/api/auth/me`, `/api/auth/oauth2/**`를 뺀 모든 API는 로그인 필요 (0장) |
+| CSRF | `POST`/`PUT`/`PATCH`/`DELETE`는 `XSRF-TOKEN` 쿠키 값을 `X-XSRF-TOKEN` 헤더로 보내야 함 |
 | 응답 래핑 | 하지 않음. 성공 시 리소스를 그대로 반환 |
 
 ### 비동기 작업
@@ -37,7 +38,11 @@
 | HTTP | code | 상황 |
 |---|---|---|
 | 400 | `INVALID_REQUEST` | 필수 값 누락, 형식 오류 (`details`에 필드별 사유) |
-| 404 | `PROJECT_NOT_FOUND`, `UPLOAD_NOT_FOUND`, `ANALYSIS_NOT_FOUND`, `ENDPOINT_RESULT_NOT_FOUND` | 리소스 없음 |
+| 401 | `UNAUTHORIZED` | 로그인하지 않았거나 세션이 만료됨 |
+| 401 | `INVALID_CREDENTIALS` | 로그인 실패 (이메일이 없거나 비밀번호가 틀림, 둘을 구분하지 않음) |
+| 403 | `CSRF_TOKEN_INVALID` | CSRF 토큰이 없거나 맞지 않음. `GET /api/auth/me`로 쿠키를 다시 받은 뒤 재시도 |
+| 404 | `PROJECT_NOT_FOUND`, `UPLOAD_NOT_FOUND`, `ANALYSIS_NOT_FOUND`, `ENDPOINT_RESULT_NOT_FOUND` | 리소스 없음. **다른 사용자의 리소스도 404** |
+| 409 | `EMAIL_ALREADY_EXISTS` | 이미 가입된 이메일로 회원가입 |
 | 409 | `UPLOAD_NOT_PARSED` | 파싱이 끝나지 않은 업로드로 분석 요청 |
 | 409 | `ANALYSIS_NOT_DONE` | 완료되지 않은 분석의 결과·내보내기 요청 |
 | 409 | `RESOURCE_BUSY` | 파싱·분석이 진행 중인 프로젝트 삭제 요청 |
@@ -55,7 +60,98 @@
 
 ---
 
+## 0. 회원·인증
+
+인증 방식과 선택 이유는 [DESIGN.md 6장](DESIGN.md#6-회원인증) 참고.
+
+```
+로그인 흐름:  앱 시작 → GET /api/auth/me
+                      ├ 200: 로그인 상태
+                      └ 401: 로그인 화면 (응답에 XSRF-TOKEN 쿠키 포함)
+             → POST /api/auth/login (X-XSRF-TOKEN 헤더) → SESSION 쿠키 발급
+```
+
+사용자 응답 형식 (0-1, 0-2, 0-4 공통):
+
+```json
+{ "id": 1, "name": "박개발", "email": "dev@example.com", "company": "TTL Labs", "createdAt": "2026-11-24T10:00:00.000Z" }
+```
+
+### 0-1. 회원가입
+
+`POST /api/auth/signup`
+
+```json
+{ "name": "박개발", "email": "dev@example.com", "password": "correct-horse-1", "company": "TTL Labs" }
+```
+
+| 필드 | 타입 | 필수 | 제약 |
+|---|---|---|---|
+| name | string | O | 앞뒤 공백 제거 후 1~50자 |
+| email | string | O | 이메일 형식, 최대 255자. 소문자로 바꿔 저장 |
+| password | string | O | 8~64자, 공백만으로 된 값 불가 |
+| company | string \| null | - | 최대 100자. 생략하거나 빈 문자열이면 `null` |
+
+비밀번호 확인은 회원가입 화면에서만 검사하고 서버로 보내지 않는다.
+
+**201 Created** — 사용자 응답. 가입과 동시에 로그인되어 `SESSION` 쿠키가 발급된다
+
+**409** `EMAIL_ALREADY_EXISTS`
+
+### 0-2. 로그인
+
+`POST /api/auth/login`
+
+```json
+{ "email": "dev@example.com", "password": "correct-horse-1" }
+```
+
+**200 OK** — 사용자 응답. 세션 ID를 새로 발급한다
+
+**401** `INVALID_CREDENTIALS` — 메시지: "이메일 또는 비밀번호가 올바르지 않습니다."
+
+### 0-3. 로그아웃
+
+`POST /api/auth/logout`
+
+**204 No Content** — 세션을 삭제하고 `SESSION` 쿠키를 만료시킨다. 로그인하지 않은 상태에서 불러도 204
+
+### 0-4. 로그인 사용자 조회
+
+`GET /api/auth/me`
+
+**200 OK** — 사용자 응답
+
+**401** `UNAUTHORIZED` — 로그인하지 않음
+
+두 경우 모두 응답에 `XSRF-TOKEN` 쿠키를 담는다. 프론트는 앱 시작 시 이 API로 로그인 여부를 확인하고 CSRF 토큰을 받는다.
+
+### 0-5. 소셜 로그인 (Google, GitHub)
+
+JSON API가 아니라 **브라우저 이동**으로 동작한다. 프론트는 버튼을 링크로 만든다.
+
+```
+GET /api/auth/oauth2/authorization/google   → Google 로그인 화면
+GET /api/auth/oauth2/authorization/github   → GitHub 로그인 화면
+        ↓ (제공자가 콜백으로 돌려보냄)
+GET /api/auth/oauth2/callback/{provider}    → 서버가 세션 발급 후 프론트로 302
+```
+
+| 결과 | 이동 위치 |
+|---|---|
+| 성공 (첫 로그인이면 회원 자동 생성) | `/` 또는 로그인 전에 가려던 화면 |
+| 같은 이메일로 가입된 회원이 이미 있음 | `/login?error=EMAIL_ALREADY_REGISTERED` |
+| 제공자에서 인증된 이메일을 받지 못함 | `/login?error=OAUTH_EMAIL_UNVERIFIED` |
+| 사용자가 취소했거나 그 밖의 실패 | `/login?error=OAUTH_FAILED` |
+
+- 설정되지 않은 제공자(클라이언트 ID 없음)로 요청하면 404 `NOT_FOUND`
+- 소셜로 가입한 회원의 사용자 응답은 이메일 가입과 같다 (`company`는 `null`)
+
+---
+
 ## 1. 프로젝트
+
+모든 프로젝트 API는 로그인 사용자가 소유한 프로젝트만 대상으로 한다. 업로드·정책·분석 API도 프로젝트 소유자를 확인한다.
 
 ### 1-1. 프로젝트 생성
 
@@ -79,7 +175,7 @@
 
 `GET /api/projects`
 
-**200 OK** — 최근 생성 순
+**200 OK** — 로그인 사용자의 프로젝트, 최근 생성 순
 
 ```json
 [
@@ -400,6 +496,9 @@ JSON에서는 `{"GET /products/:id/stock": null}`로 내보내고 `_reasons` 객
 
 | 화면 | 호출 API |
 |---|---|
+| 앱 시작 (로그인 확인) | 0-4 |
+| 로그인 / 회원가입 | 0-2, 0-1, 0-5 |
+| 로그아웃 | 0-3 |
 | 프로젝트 목록 / 생성 | 1-2, 1-1 |
 | 로그 업로드 | 2-1 → 2-3 폴링 |
 | 업로드 이력 | 2-2, 4-2 |

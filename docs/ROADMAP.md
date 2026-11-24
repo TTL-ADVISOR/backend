@@ -12,13 +12,14 @@ GitHub Organization `TTL-ADVISOR`의 Project 보드 **"TTL Advisor v1"** 에서 
 | `type: test` | 테스트 보강 |
 | `type: infra` | Docker, 배포 |
 | `type: docs` | 문서 |
-| `area: api` / `area: ingest` / `area: analysis` / `area: ui` | 영역 |
+| `area: api` / `area: ingest` / `area: analysis` / `area: ui` / `area: auth` | 영역 |
 
 ## 마일스톤
 
 | 마일스톤 | 목표 |
 |---|---|
 | M1 기반 구축 | 백엔드·프론트 뼈대, DB 스키마, 프로젝트 CRUD |
+| M1.5 회원·인증 | 회원가입·로그인, 세션, 프로젝트 소유권. 이후 모든 API가 로그인 사용자 기준이 되므로 M2 전에 진행 |
 | M2 로그 수집 | 업로드 → 파싱 → 저장, 정책 관리 |
 | M3 분석 엔진 | TTL 시뮬레이션·추천, 분석 API, 샘플 로그 생성기 |
 | M4 리포트 | 대시보드, 곡선 차트, 설정 내보내기 |
@@ -36,12 +37,20 @@ GitHub Organization `TTL-ADVISOR`의 Project 보드 **"TTL Advisor v1"** 에서 
 | F1 | frontend | [Setup] Vite + React + TS 초기 설정 | Router, TanStack Query, API 클라이언트, 에러 타입, Vitest·MSW |
 | F2 | frontend | [UI] 프로젝트 목록·생성 화면 | API 1-1, 1-2 연동 |
 
+### M1.5 회원·인증
+| # | 저장소 | 제목 | 완료 조건 |
+|---|---|---|---|
+| B16 | backend | [Auth] 회원가입·로그인과 세션 인증 (API 0-1~0-4) | `V2` 마이그레이션(`users`, Spring Session 테이블), Spring Security 세션 인증, BCrypt, CSRF 쿠키, 401·403 에러 형식 통일, MockMvc 테스트 |
+| B17 | backend | [Auth] 프로젝트 소유권 적용 | `project.owner_id`, 프로젝트 API를 로그인 사용자 기준으로 변경, 다른 사용자 리소스 404, 소유권 테스트 |
+| B18 | backend | [Auth] Google·GitHub 로그인 (API 0-5) | `oauth_account`, `oauth2Login` 경로를 `/api/auth/oauth2/**`로, 제공자별 이메일 검증, 같은 이메일 기존 회원 거절, 실패 시 `/login?error=` 이동, 환경 변수 없으면 비활성, 테스트 |
+| F9 | frontend | [UI] 로그인·회원가입 화면과 인증 처리 | 이름·이메일·비밀번호·비밀번호 확인·회사(선택) 폼, Google·GitHub 버튼과 `?error=` 안내, 로그인 확인(0-4), 비로그인 시 로그인 화면으로 이동 후 원래 화면 복귀, `apiFetch`에 CSRF 헤더, 401 시 캐시 비우고 로그인으로, 헤더에 계정·로그아웃 |
+
 ### M2 로그 수집
 | # | 저장소 | 제목 | 완료 조건 |
 |---|---|---|---|
 | B5 | backend | [Ingest] 경로 정규화 PathNormalizer | `:id`/`:uuid`/`:hash` 규칙, 커스텀 패턴 우선, 쿼리 정렬 캐시 키, 단위 테스트 |
 | B6 | backend | [Ingest] JSON Lines 파서 | 필드 검증, 실패 줄 수집(최대 20개), 형식 판별 |
-| B7 | backend | [API] 로그 업로드와 비동기 파싱 (API 2-1~2-3) | 100MB 제한, JdbcTemplate 배치 insert, 진행률, 상태 전이 |
+| B7 | backend | [API] 로그 업로드와 비동기 파싱 (API 2-1~2-3) | 100MB 제한, JdbcTemplate 배치 insert, 진행률, 상태 전이, 소유자 확인 |
 | B8 | backend | [API] 엔드포인트 정책 (API 3-1, 3-2) | 일괄 교체, 중복·형식 검증 |
 | F3 | frontend | [UI] 로그 업로드 화면 | 드래그앤드롭, 진행률 폴링, 오류 샘플 표시 |
 | F4 | frontend | [UI] 패턴·정책 관리 화면 | 정책 편집 후 재분석 유도 |
