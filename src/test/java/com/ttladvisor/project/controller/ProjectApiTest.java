@@ -3,6 +3,8 @@ package com.ttladvisor.project.controller;
 import com.ttladvisor.TestcontainersConfiguration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.matchesPattern;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -10,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import jakarta.servlet.http.Cookie;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +23,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -29,10 +34,38 @@ class ProjectApiTest {
     private static final String ISO_MILLIS = "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z";
 
     @Autowired
+    WebApplicationContext context;
+
+    /**
+     * 프로젝트 API는 로그인이 필요하다. 모든 요청을 로그인 상태 + CSRF 토큰 포함으로 보낸다.
+     *
+     * <p>spring-security-test의 {@code csrf()}는 쓰지 않는다. 캐시된 스프링 컨텍스트 안의 CSRF 토큰 저장소를
+     * 쿠키를 쓰지 않는 테스트용으로 바꿔 버려서, 같은 컨텍스트를 쓰는 다른 테스트(AuthApiTest)가 실행 순서에 따라
+     * XSRF-TOKEN 쿠키를 받지 못하고 실패했다. 대신 실제 브라우저처럼 같은 값을 쿠키와 헤더로 보낸다.
+     */
     MockMvc mvc;
+
+    private static final String CSRF = "test-csrf-token";
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @BeforeEach
+    void setUpMvc() {
+        mvc = MockMvcBuilders.webAppContextSetup(context)
+                .apply(springSecurity())
+                .defaultRequest(get("/").with(user("tester"))
+                        .cookie(new Cookie("XSRF-TOKEN", CSRF)).header("X-XSRF-TOKEN", CSRF))
+                .build();
+    }
+
+    @Test
+    void 로그인하지_않으면_401이다() throws Exception {
+        MockMvc anonymous = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+        anonymous.perform(get("/api/projects"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
 
     @BeforeEach
     void clean() {

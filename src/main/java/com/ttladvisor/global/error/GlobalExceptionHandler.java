@@ -84,6 +84,8 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static ErrorCode codeFor(HttpStatusCode status) {
         return switch (status.value()) {
+            case 401 -> ErrorCode.UNAUTHORIZED;
+            case 403 -> ErrorCode.FORBIDDEN;
             case 404 -> ErrorCode.NOT_FOUND;
             case 405 -> ErrorCode.METHOD_NOT_ALLOWED;
             case 413 -> ErrorCode.FILE_TOO_LARGE;

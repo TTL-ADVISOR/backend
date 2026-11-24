@@ -40,14 +40,15 @@ class SchemaMigrationTest {
     EntityManager em;
 
     @Test
-    void v1_마이그레이션이_적용되고_7개_테이블이_생성된다() {
+    void 마이그레이션이_적용되고_테이블이_생성된다() {
         List<String> versions = jdbc.queryForList(
                 "SELECT version FROM flyway_schema_history WHERE success = 1 ORDER BY installed_rank", String.class);
-        assertThat(versions).contains("1");
+        assertThat(versions).contains("1", "2");
 
         List<String> tables = jdbc.queryForList(
                 "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()", String.class);
-        assertThat(tables).contains("project", "endpoint_policy", "log_upload", "request_log",
+        assertThat(tables).contains("users", "SPRING_SESSION", "SPRING_SESSION_ATTRIBUTES",
+                "project", "endpoint_policy", "log_upload", "request_log",
                 "analysis", "endpoint_result", "ttl_sim_point");
     }
 

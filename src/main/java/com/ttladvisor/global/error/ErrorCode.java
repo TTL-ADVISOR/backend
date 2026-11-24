@@ -9,6 +9,12 @@ public enum ErrorCode {
 
     INVALID_REQUEST(HttpStatus.BAD_REQUEST, "요청 값이 올바르지 않습니다."),
 
+    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."),
+    INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."),
+
+    CSRF_TOKEN_INVALID(HttpStatus.FORBIDDEN, "요청을 확인할 수 없습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요."),
+    FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
+
     NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 경로를 찾을 수 없습니다."),
     PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "프로젝트를 찾을 수 없습니다."),
     UPLOAD_NOT_FOUND(HttpStatus.NOT_FOUND, "업로드를 찾을 수 없습니다."),
@@ -20,6 +26,7 @@ public enum ErrorCode {
     UPLOAD_NOT_PARSED(HttpStatus.CONFLICT, "파싱이 끝난 업로드만 분석할 수 있습니다."),
     ANALYSIS_NOT_DONE(HttpStatus.CONFLICT, "완료된 분석만 조회할 수 있습니다."),
     RESOURCE_BUSY(HttpStatus.CONFLICT, "파싱 또는 분석이 진행 중입니다."),
+    EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 가입된 이메일입니다."),
 
     FILE_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "파일은 100MB를 넘을 수 없습니다."),
     UNSUPPORTED_FORMAT(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 형식입니다."),

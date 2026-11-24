@@ -16,6 +16,10 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  session:
+    jdbc:
+      # 세션 테이블은 Flyway V2에서 만든다
+      initialize-schema: never
   servlet:
     multipart:
       max-file-size: 100MB
@@ -23,6 +27,15 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  # nginx가 HTTPS를 끝내고 HTTP로 넘겨도 원래 요청이 HTTPS였음을 알게 한다 (X-Forwarded-Proto).
+  # 그래야 세션·CSRF 쿠키에 Secure가 붙는다. native(Tomcat RemoteIpValve)는 내부 IP 대역의 프록시가
+  # 보낸 헤더만 믿으므로, 외부에서 헤더를 꾸며 보내도 적용되지 않는다.
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:native}
+  servlet:
+    session:
+      # 마지막 요청 후 30분이 지나면 로그아웃 (Spring Session이 이 값을 쓴다)
+      timeout: 30m
+      # 세션 쿠키 속성(HttpOnly, SameSite=Lax)은 SecurityConfig.cookieSerializer에서 정한다
 
 app:
   cors:

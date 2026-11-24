@@ -38,9 +38,10 @@
 | HTTP | code | 상황 |
 |---|---|---|
 | 400 | `INVALID_REQUEST` | 필수 값 누락, 형식 오류 (`details`에 필드별 사유) |
-| 401 | `UNAUTHORIZED` | 로그인하지 않았거나 세션이 만료됨 |
+| 401 | `UNAUTHORIZED` | 로그인하지 않았거나 세션이 만료됨. 쓰기 요청은 CSRF 검사가 먼저라, 토큰이 없으면 아래 403이 먼저 온다 |
 | 401 | `INVALID_CREDENTIALS` | 로그인 실패 (이메일이 없거나 비밀번호가 틀림, 둘을 구분하지 않음) |
 | 403 | `CSRF_TOKEN_INVALID` | CSRF 토큰이 없거나 맞지 않음. `GET /api/auth/me`로 쿠키를 다시 받은 뒤 재시도 |
+| 403 | `FORBIDDEN` | 그 밖의 권한 부족 (v1에서는 쓰이지 않음) |
 | 404 | `PROJECT_NOT_FOUND`, `UPLOAD_NOT_FOUND`, `ANALYSIS_NOT_FOUND`, `ENDPOINT_RESULT_NOT_FOUND` | 리소스 없음. **다른 사용자의 리소스도 404** |
 | 409 | `EMAIL_ALREADY_EXISTS` | 이미 가입된 이메일로 회원가입 |
 | 409 | `UPLOAD_NOT_PARSED` | 파싱이 끝나지 않은 업로드로 분석 요청 |
@@ -89,7 +90,7 @@
 |---|---|---|---|
 | name | string | O | 앞뒤 공백 제거 후 1~50자 |
 | email | string | O | 이메일 형식, 최대 255자. 소문자로 바꿔 저장 |
-| password | string | O | 8~64자, 공백만으로 된 값 불가 |
+| password | string | O | 8~64자, 공백만으로 된 값 불가, UTF-8 72바이트 이하 (한글 24자) |
 | company | string \| null | - | 최대 100자. 생략하거나 빈 문자열이면 `null` |
 
 비밀번호 확인은 회원가입 화면에서만 검사하고 서버로 보내지 않는다.
