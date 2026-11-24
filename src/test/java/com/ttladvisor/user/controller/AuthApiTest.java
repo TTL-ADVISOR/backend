@@ -62,7 +62,7 @@ class AuthApiTest {
     void 가입하면_201과_함께_로그인되고_비밀번호는_해시로만_저장된다() throws Exception {
         Browser browser = new Browser();
         browser.send(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content("""
-                        {"name":"  박개발 ","email":"Dev@Example.COM","password":"correct-horse-1","company":"  "}
+                        {"name":"  박개발 ","email":" Dev@Example.COM ","password":"correct-horse-1","company":"  "}
                         """))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/api/auth/me"))
@@ -101,6 +101,15 @@ class AuthApiTest {
                 .andExpect(jsonPath("$.details.name").exists())
                 .andExpect(jsonPath("$.details.email").value("이메일 형식이 올바르지 않습니다."))
                 .andExpect(jsonPath("$.details.password").value("비밀번호는 8~64자여야 합니다."));
+    }
+
+    @Test
+    void 앞뒤_공백은_지운_뒤_길이를_검사한다() throws Exception {
+        String name = "가".repeat(50);
+        new Browser().send(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON).content(
+                        "{\"name\":\"  %s  \",\"email\":\"a@example.com\",\"password\":\"correct-horse-1\"}".formatted(name)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").value(name));
     }
 
     @Test
@@ -187,6 +196,22 @@ class AuthApiTest {
                         .content("{\"email\":\"dev@example.com\",\"password\":\"correct-horse-1\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("CSRF_TOKEN_INVALID"));
+    }
+
+    @Test
+    void 로그인하지_않은_쓰기_요청은_CSRF_검사가_먼저라_토큰이_없으면_403_있으면_401이다() throws Exception {
+        mvc.perform(post("/api/projects").contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"a\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CSRF_TOKEN_INVALID"));
+
+        new Browser().send(post("/api/projects").contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"a\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void 로그인하지_않은_상태의_로그아웃도_204다() throws Exception {
+        new Browser().send(post("/api/auth/logout")).andExpect(status().isNoContent());
     }
 
     /** 쿠키를 저장해 두었다가 다음 요청에 보내고, XSRF-TOKEN 쿠키 값을 헤더로 붙이는 브라우저 흉내. */

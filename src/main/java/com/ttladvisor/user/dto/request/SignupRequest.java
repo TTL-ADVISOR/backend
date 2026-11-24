@@ -23,4 +23,15 @@ public record SignupRequest(
 
         @Size(max = 100, message = "회사는 100자 이하여야 합니다.")
         String company) {
+
+    /** 앞뒤 공백을 먼저 지운 뒤 검증한다. 그래야 " 이름 "처럼 공백 때문에 길이 제한에 걸리지 않는다. */
+    public SignupRequest {
+        name = strip(name);
+        email = strip(email);
+        company = strip(company);
+    }
+
+    private static String strip(String value) {
+        return value == null ? null : value.strip();
+    }
 }

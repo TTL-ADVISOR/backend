@@ -38,7 +38,7 @@
 | HTTP | code | 상황 |
 |---|---|---|
 | 400 | `INVALID_REQUEST` | 필수 값 누락, 형식 오류 (`details`에 필드별 사유) |
-| 401 | `UNAUTHORIZED` | 로그인하지 않았거나 세션이 만료됨 |
+| 401 | `UNAUTHORIZED` | 로그인하지 않았거나 세션이 만료됨. 쓰기 요청은 CSRF 검사가 먼저라, 토큰이 없으면 아래 403이 먼저 온다 |
 | 401 | `INVALID_CREDENTIALS` | 로그인 실패 (이메일이 없거나 비밀번호가 틀림, 둘을 구분하지 않음) |
 | 403 | `CSRF_TOKEN_INVALID` | CSRF 토큰이 없거나 맞지 않음. `GET /api/auth/me`로 쿠키를 다시 받은 뒤 재시도 |
 | 403 | `FORBIDDEN` | 그 밖의 권한 부족 (v1에서는 쓰이지 않음) |
