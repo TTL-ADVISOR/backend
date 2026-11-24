@@ -95,7 +95,8 @@ TTL별 지표:
 
 - 이름·이메일·비밀번호·비밀번호 확인·회사(선택)로 가입하고, 이메일 + 비밀번호로 로그인한다. 비밀번호는 BCrypt 해시로만 저장한다
 - Google·GitHub 계정으로도 가입·로그인할 수 있다 (아래 "소셜 로그인")
-- 로그인하면 서버가 세션을 만들고 `SESSION` 쿠키(HttpOnly, Secure, SameSite=Lax)를 내려준다
+- 로그인하면 서버가 세션을 만들고 `SESSION` 쿠키(HttpOnly, SameSite=Lax, HTTPS면 Secure)를 내려준다.
+  쿠키 속성은 `CookieSerializer` 빈으로 직접 정한다. 정하지 않으면 서블릿 컨테이너 설정을 따라가 HttpOnly가 빠질 수 있다
 - 세션은 **Spring Session JDBC**로 MySQL에 저장한다. 서버를 재시작하거나 여러 대로 늘려도 로그인이 유지된다
 - 세션 만료: 마지막 요청 후 30분. 분석 폴링 중에는 계속 연장된다
 - 로그인 성공 시 세션 ID를 새로 발급한다 (세션 고정 공격 방지, Spring Security 기본 동작)
@@ -140,6 +141,8 @@ TTL별 지표:
 - Spring Security CSRF 보호를 켜고, 토큰을 `XSRF-TOKEN` 쿠키(JS에서 읽을 수 있음)로 내려준다
 - 프론트는 `POST`/`PUT`/`PATCH`/`DELETE` 요청에 쿠키 값을 `X-XSRF-TOKEN` 헤더로 붙인다 (`apiFetch` 한 곳에서 처리)
 - 앱 시작 시 `GET /api/auth/me`를 호출해 로그인 여부를 확인하고 CSRF 쿠키를 받는다
+- Spring Security는 토큰을 읽을 때까지 만들지 않으므로(지연 로딩), 매 요청 토큰을 읽는 `CsrfCookieFilter`를 둔다. 없으면 GET만 하는 SPA는 쿠키를 받지 못한다
+- 로그인 성공 시 CSRF 토큰도 새로 발급한다
 - 로그인·회원가입 요청도 CSRF 검사 대상이다 (로그인 CSRF 방지)
 
 ### 권한: 프로젝트 소유자만 접근
@@ -156,7 +159,7 @@ TTL별 지표:
 |---|---|
 | 이름 | 필수, 앞뒤 공백 제거 후 1~50자 |
 | 이메일 | 형식 검사, 최대 255자, 소문자로 정규화해 저장, 중복 불가(DB `UNIQUE`) |
-| 비밀번호 | 8~64자, 공백만으로 된 값 불가 |
+| 비밀번호 | 8~64자, 공백만으로 된 값 불가, UTF-8 72바이트 이하 (BCrypt가 앞 72바이트만 쓰기 때문. 한글은 24자까지) |
 | 비밀번호 확인 | 프론트에서만 비밀번호와 같은지 검사하고 서버로 보내지 않는다 (서버가 받아도 검증할 정보가 늘지 않음) |
 | 회사 | 선택, 앞뒤 공백 제거 후 최대 100자. 빈 값은 `null`로 저장 |
 | 가입 후 | 바로 로그인 상태가 된다 |
@@ -306,8 +309,11 @@ erDiagram
   파싱·분석이 진행 중인 프로젝트는 삭제할 수 없다 (409)
 - FK 규칙: `request_log → log_upload`만 CASCADE 없음(대량 연쇄 삭제 방지, 먼저 지우지 않으면 삭제 실패). 나머지 FK는 `ON DELETE CASCADE`
 - `request_log`는 JPA 엔티티를 두지 않는다 (JdbcTemplate 전용)
-- 회원·소유자는 `V2` 마이그레이션으로 추가한다: `users`·`oauth_account` 생성, `project.owner_id` (`NOT NULL`, FK `ON DELETE` 없음),
-  Spring Session 테이블(`SPRING_SESSION`, `SPRING_SESSION_ATTRIBUTES`)
+- 회원 관련 마이그레이션은 이슈별로 나눈다
+  - `V2__users_and_sessions.sql` (B16): `users`, Spring Session 테이블(`SPRING_SESSION`, `SPRING_SESSION_ATTRIBUTES`).
+    세션 스키마도 Flyway 한 곳에서 관리하므로 `spring.session.jdbc.initialize-schema=never`
+  - V3 (B17): `project.owner_id` (`NOT NULL`, FK `ON DELETE` 없음)
+  - V4 (B18): `oauth_account`
 - `project.owner_id` FK에 CASCADE를 두지 않는다. 회원 탈퇴(v2)는 프로젝트 삭제와 같은 배치 삭제 절차를 거쳐야 한다
 - 아직 배포 전이라 운영 데이터가 없다. 기존 프로젝트가 있는 개발 DB는 `docker compose down -v`로 비운 뒤 V2를 적용한다
 
@@ -380,7 +386,7 @@ backend/src/main/java/com/ttladvisor/
 ```
 backend/src/main/resources/
  ├ application.yml
- └ db/migration/V1__init.sql, V2__users_and_ownership.sql
+ └ db/migration/V1__init.sql, V2__users_and_sessions.sql, ...
 ```
 
 ## 10. 프론트엔드 구조

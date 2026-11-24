@@ -18,6 +18,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 import org.springframework.test.web.servlet.MockMvc;
@@ -31,6 +32,7 @@ import org.springframework.web.bind.annotation.RestController;
 @AutoConfigureMockMvc
 @Import({TestcontainersConfiguration.class, WebConfigIntegrationTest.PingController.class,
         WebConfigIntegrationTest.AsyncProbe.class})
+@WithMockUser
 class WebConfigIntegrationTest {
 
     @Autowired
