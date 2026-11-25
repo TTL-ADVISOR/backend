@@ -1,5 +1,6 @@
 package com.ttladvisor.project.controller;
 
+import com.ttladvisor.global.security.AuthUser;
 import com.ttladvisor.project.domain.entity.Project;
 import com.ttladvisor.project.dto.request.CreateProjectRequest;
 import com.ttladvisor.project.dto.response.ProjectResponse;
@@ -9,6 +10,7 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,25 +30,26 @@ public class ProjectController {
     }
 
     @PostMapping
-    public ResponseEntity<ProjectResponse> create(@Valid @RequestBody CreateProjectRequest request) {
-        Project project = projectService.create(request.name());
+    public ResponseEntity<ProjectResponse> create(@AuthenticationPrincipal AuthUser user,
+                                                  @Valid @RequestBody CreateProjectRequest request) {
+        Project project = projectService.create(user.id(), request.name());
         return ResponseEntity.created(URI.create("/api/projects/" + project.getId()))
                 .body(ProjectResponse.from(project));
     }
 
     @GetMapping
-    public List<ProjectSummaryResponse> list() {
-        return projectService.list().stream().map(ProjectSummaryResponse::from).toList();
+    public List<ProjectSummaryResponse> list(@AuthenticationPrincipal AuthUser user) {
+        return projectService.list(user.id()).stream().map(ProjectSummaryResponse::from).toList();
     }
 
     @GetMapping("/{projectId}")
-    public ProjectSummaryResponse get(@PathVariable long projectId) {
-        return ProjectSummaryResponse.from(projectService.get(projectId));
+    public ProjectSummaryResponse get(@AuthenticationPrincipal AuthUser user, @PathVariable long projectId) {
+        return ProjectSummaryResponse.from(projectService.get(user.id(), projectId));
     }
 
     @DeleteMapping("/{projectId}")
-    public ResponseEntity<Void> delete(@PathVariable long projectId) {
-        projectService.delete(projectId);
+    public ResponseEntity<Void> delete(@AuthenticationPrincipal AuthUser user, @PathVariable long projectId) {
+        projectService.delete(user.id(), projectId);
         return ResponseEntity.noContent().build();
     }
 }

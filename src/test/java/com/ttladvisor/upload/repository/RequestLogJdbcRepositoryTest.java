@@ -1,5 +1,6 @@
 package com.ttladvisor.upload.repository;
 
+import com.ttladvisor.TestData;
 import com.ttladvisor.TestcontainersConfiguration;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -25,7 +26,7 @@ class RequestLogJdbcRepositoryTest {
 
     @Test
     void 배치_크기로_나눠_지우고_다른_업로드의_로그는_남긴다() {
-        jdbc.update("INSERT INTO project (name, created_at) VALUES ('p', NOW(3))");
+        jdbc.update("INSERT INTO project (owner_id, name, created_at) VALUES (?, 'p', NOW(3))", owner());
         long projectId = jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
         long target = insertUpload(projectId);
         long other = insertUpload(projectId);
@@ -44,7 +45,7 @@ class RequestLogJdbcRepositoryTest {
 
     @Test
     void 배치_크기의_배수만큼_있어도_모두_지운다() {
-        jdbc.update("INSERT INTO project (name, created_at) VALUES ('p', NOW(3))");
+        jdbc.update("INSERT INTO project (owner_id, name, created_at) VALUES (?, 'p', NOW(3))", owner());
         long projectId = jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
         long upload = insertUpload(projectId);
         insertLogs(upload, 20);
@@ -53,6 +54,12 @@ class RequestLogJdbcRepositoryTest {
         assertThat(countLogs(upload)).isZero();
 
         jdbc.update("DELETE FROM project WHERE id = ?", projectId);
+    }
+
+    private long owner() {
+        Long id = jdbc.query("SELECT id FROM users WHERE email = 'repo-test@example.com'",
+                rs -> rs.next() ? rs.getLong(1) : null);
+        return id != null ? id : TestData.insertUser(jdbc, "repo-test@example.com");
     }
 
     private long insertUpload(long projectId) {
