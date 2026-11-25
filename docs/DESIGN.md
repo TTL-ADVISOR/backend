@@ -316,10 +316,11 @@ erDiagram
 - 회원 관련 마이그레이션은 이슈별로 나눈다
   - `V2__users_and_sessions.sql` (B16): `users`, Spring Session 테이블(`SPRING_SESSION`, `SPRING_SESSION_ATTRIBUTES`).
     세션 스키마도 Flyway 한 곳에서 관리하므로 `spring.session.jdbc.initialize-schema=never`
-  - V3 (B17): `project.owner_id` (`NOT NULL`, FK `ON DELETE` 없음)
+  - `V3__project_owner.sql` (B17): `project.owner_id` (`NOT NULL`, FK `ON DELETE` 없음), 인덱스 `(owner_id, created_at)`.
+    로그인 기능 전에 만든 소유자 없는 프로젝트는 가장 먼저 가입한 회원에게 준다 (개발 DB 데이터를 지우지 않기 위해).
+    회원이 없는데 프로젝트가 있으면 NOT NULL 단계에서 실패해 마이그레이션이 멈춘다
   - V4 (B18): `oauth_account`
 - `project.owner_id` FK에 CASCADE를 두지 않는다. 회원 탈퇴(v2)는 프로젝트 삭제와 같은 배치 삭제 절차를 거쳐야 한다
-- 아직 배포 전이라 운영 데이터가 없다. 기존 프로젝트가 있는 개발 DB는 `docker compose down -v`로 비운 뒤 V2를 적용한다
 
 ## 8. REST API
 

@@ -1,9 +1,11 @@
 package com.ttladvisor.project.controller;
 
+import com.ttladvisor.TestData;
 import com.ttladvisor.TestcontainersConfiguration;
+import com.ttladvisor.global.security.AuthUser;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.matchesPattern;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -14,6 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import jakarta.servlet.http.Cookie;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +25,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -50,11 +55,26 @@ class ProjectApiTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    /** 로그인한 사용자(프로젝트 소유자)와 다른 사용자. */
+    long ownerId;
+    long otherId;
+    MockMvc otherMvc;
+
     @BeforeEach
-    void setUpMvc() {
-        mvc = MockMvcBuilders.webAppContextSetup(context)
+    void setUp() {
+        TestData.deleteAll(jdbc);
+        ownerId = TestData.insertUser(jdbc, "owner@example.com");
+        otherId = TestData.insertUser(jdbc, "other@example.com");
+        mvc = mvcAs(ownerId);
+        otherMvc = mvcAs(otherId);
+    }
+
+    private MockMvc mvcAs(long userId) {
+        var auth = UsernamePasswordAuthenticationToken.authenticated(
+                new AuthUser(userId), null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        return MockMvcBuilders.webAppContextSetup(context)
                 .apply(springSecurity())
-                .defaultRequest(get("/").with(user("tester"))
+                .defaultRequest(get("/").with(authentication(auth))
                         .cookie(new Cookie("XSRF-TOKEN", CSRF)).header("X-XSRF-TOKEN", CSRF))
                 .build();
     }
@@ -67,11 +87,6 @@ class ProjectApiTest {
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
 
-    @BeforeEach
-    void clean() {
-        jdbc.update("DELETE FROM request_log");
-        jdbc.update("DELETE FROM project"); // 나머지는 CASCADE
-    }
 
     // ---- 1-1 생성 ----
 
@@ -198,10 +213,54 @@ class ProjectApiTest {
                 .andExpect(jsonPath("$.code").value("PROJECT_NOT_FOUND"));
     }
 
+    // ---- 소유권 ----
+
+    @Test
+    void 목록에는_내_프로젝트만_나온다() throws Exception {
+        insertProject(ownerId, "내 프로젝트", "2026-11-23T10:00:00Z");
+        insertProject(otherId, "남의 프로젝트", "2026-11-23T11:00:00Z");
+
+        mvc.perform(get("/api/projects"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].name").value("내 프로젝트"));
+    }
+
+    @Test
+    void 남의_프로젝트는_조회도_삭제도_404이고_지워지지_않는다() throws Exception {
+        long othersProject = insertProject(otherId, "남의 프로젝트", "2026-11-23T10:00:00Z");
+
+        mvc.perform(get("/api/projects/" + othersProject))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PROJECT_NOT_FOUND"));
+        mvc.perform(delete("/api/projects/" + othersProject))
+                .andExpect(status().isNotFound());
+
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM project WHERE id = ?", Integer.class, othersProject))
+                .isEqualTo(1);
+        // 없는 ID와 응답이 같다 (남의 프로젝트가 있다는 사실이 드러나지 않는다)
+        String others = mvc.perform(get("/api/projects/" + othersProject)).andReturn().getResponse().getContentAsString();
+        String missing = mvc.perform(get("/api/projects/999999")).andReturn().getResponse().getContentAsString();
+        assertThat(others.replace(String.valueOf(othersProject), "ID")).isEqualTo(missing.replace("999999", "ID"));
+    }
+
+    @Test
+    void 만든_프로젝트의_소유자는_로그인한_사용자다() throws Exception {
+        mvc.perform(post("/api/projects").contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"새 프로젝트\"}"))
+                .andExpect(status().isCreated());
+
+        assertThat(jdbc.queryForObject("SELECT owner_id FROM project", Long.class)).isEqualTo(ownerId);
+        otherMvc.perform(get("/api/projects")).andExpect(jsonPath("$.length()").value(0));
+    }
+
     // ---- helpers ----
 
     private long insertProject(String name, String createdAt) {
-        jdbc.update("INSERT INTO project (name, created_at) VALUES (?, ?)", name, Instant.parse(createdAt));
+        return insertProject(ownerId, name, createdAt);
+    }
+
+    private long insertProject(long owner, String name, String createdAt) {
+        jdbc.update("INSERT INTO project (owner_id, name, created_at) VALUES (?, ?, ?)", owner, name, Instant.parse(createdAt));
         return lastId();
     }
 

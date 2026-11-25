@@ -43,7 +43,7 @@ class SchemaMigrationTest {
     void 마이그레이션이_적용되고_테이블이_생성된다() {
         List<String> versions = jdbc.queryForList(
                 "SELECT version FROM flyway_schema_history WHERE success = 1 ORDER BY installed_rank", String.class);
-        assertThat(versions).contains("1", "2");
+        assertThat(versions).contains("1", "2", "3");
 
         List<String> tables = jdbc.queryForList(
                 "SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()", String.class);
@@ -54,7 +54,7 @@ class SchemaMigrationTest {
 
     @Test
     void 엔티티를_저장하고_다시_읽을_수_있다() {
-        Project project = persist(new Project("demo", NOW));
+        Project project = persist(new Project(TestData.insertUser(jdbc, "schema-entity@example.com"), "demo", NOW));
         persist(new EndpointPolicy(project, "GET", "/users/:id", 60, false));
         LogUpload upload = persist(new LogUpload(project, "access.jsonl", NOW));
         Analysis analysis = persist(new Analysis(upload, "{\"kneeRatio\":0.9}", NOW));
@@ -114,7 +114,8 @@ class SchemaMigrationTest {
     }
 
     private long insertProject() {
-        jdbc.update("INSERT INTO project (name, created_at) VALUES ('p', ?)", NOW);
+        long owner = TestData.insertUser(jdbc, "schema-" + System.nanoTime() + "@example.com");
+        jdbc.update("INSERT INTO project (owner_id, name, created_at) VALUES (?, 'p', ?)", owner, NOW);
         return lastId();
     }
 

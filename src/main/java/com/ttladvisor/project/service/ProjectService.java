@@ -47,20 +47,31 @@ public class ProjectService {
     }
 
     @Transactional
-    public Project create(String name) {
+    public Project create(long ownerId, String name) {
         // DB는 밀리초까지 저장하므로 응답과 저장 값이 같도록 미리 자른다
         Instant now = Instant.now(clock).truncatedTo(ChronoUnit.MILLIS);
-        return projects.save(new Project(name.strip(), now));
+        return projects.save(new Project(ownerId, name.strip(), now));
     }
 
     @Transactional(readOnly = true)
-    public List<ProjectSummary> list() {
-        return projects.findAllSummaries();
+    public List<ProjectSummary> list(long ownerId) {
+        return projects.findAllSummaries(ownerId);
     }
 
+    /** 다른 사용자의 프로젝트도 404다. 403이면 그 ID의 프로젝트가 있다는 사실이 드러난다. */
     @Transactional(readOnly = true)
-    public ProjectSummary get(long projectId) {
-        return projects.findSummaryById(projectId).orElseThrow(() -> notFound(projectId));
+    public ProjectSummary get(long ownerId, long projectId) {
+        return projects.findSummaryById(projectId, ownerId).orElseThrow(() -> notFound(projectId));
+    }
+
+    /**
+     * 프로젝트가 있고 소유자가 맞는지 확인한다. 업로드·정책·분석 API도 이걸 거쳐 소유자를 확인한다.
+     */
+    @Transactional(readOnly = true)
+    public void checkOwner(long ownerId, long projectId) {
+        if (!projects.existsByIdAndOwnerId(projectId, ownerId)) {
+            throw notFound(projectId);
+        }
     }
 
     /**
@@ -68,10 +79,8 @@ public class ProjectService {
      * 트랜잭션을 걸지 않는다: 요청 로그를 배치마다 커밋하며 지운 뒤, 프로젝트 행을 지우면
      * 나머지(정책·업로드·분석·결과)는 FK ON DELETE CASCADE로 함께 삭제된다.
      */
-    public void delete(long projectId) {
-        if (!projects.existsById(projectId)) {
-            throw notFound(projectId);
-        }
+    public void delete(long ownerId, long projectId) {
+        checkOwner(ownerId, projectId);
         if (uploads.existsByProjectIdAndStatusIn(projectId, BUSY_UPLOAD)
                 || analyses.existsByUploadProjectIdAndStatusIn(projectId, BUSY_ANALYSIS)) {
             throw busy(projectId);

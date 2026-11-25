@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.ttladvisor.TestData;
 import com.ttladvisor.TestcontainersConfiguration;
 import jakarta.servlet.http.Cookie;
 import java.util.LinkedHashMap;
@@ -41,8 +42,7 @@ class AuthApiTest {
 
     @BeforeEach
     void clean() {
-        jdbc.update("DELETE FROM SPRING_SESSION");
-        jdbc.update("DELETE FROM users");
+        TestData.deleteAll(jdbc);
     }
 
     // ---- 0-4 내 정보 ----

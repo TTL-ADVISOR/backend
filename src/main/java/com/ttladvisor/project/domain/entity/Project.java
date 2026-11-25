@@ -16,6 +16,10 @@ public class Project {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** 소유자 회원 ID. 프로젝트는 소유자만 보고 바꿀 수 있다. */
+    @Column(name = "owner_id", nullable = false, updatable = false)
+    private Long ownerId;
+
     @Column(nullable = false, length = 100)
     private String name;
 
@@ -25,13 +29,18 @@ public class Project {
     protected Project() {
     }
 
-    public Project(String name, Instant createdAt) {
+    public Project(Long ownerId, String name, Instant createdAt) {
+        this.ownerId = ownerId;
         this.name = name;
         this.createdAt = createdAt;
     }
 
     public Long getId() {
         return id;
+    }
+
+    public Long getOwnerId() {
+        return ownerId;
     }
 
     public String getName() {
