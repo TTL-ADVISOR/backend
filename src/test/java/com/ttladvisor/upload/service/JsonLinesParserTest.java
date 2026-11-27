@@ -193,6 +193,28 @@ class JsonLinesParserTest {
     }
 
     @Test
+    void 줄_수_한도를_넘으면_더_읽지_않고_알린다() throws IOException {
+        List<JsonLinesParser.ParsedLog> logs = new ArrayList<>();
+
+        var atLimit = parser.parse(new StringReader(VALID_LOG.repeat(3)), log -> { }, line -> { }, 3);
+        var overLimit = parser.parse(new StringReader(VALID_LOG.repeat(4)), logs::add, line -> { }, 3);
+
+        assertThat(atLimit.tooManyLines()).isFalse();
+        assertThat(overLimit.tooManyLines()).isTrue();
+        assertThat(overLimit.processedLines()).isEqualTo(3);
+        assertThat(logs).hasSize(3);
+    }
+
+    @Test
+    void 줄을_읽을_때마다_진행_줄_수를_알린다() throws IOException {
+        List<Integer> progress = new ArrayList<>();
+
+        parser.parse(new StringReader(VALID_LOG + "invalid\n" + VALID_LOG), log -> { }, progress::add, 10);
+
+        assertThat(progress).containsExactly(1, 2, 3);
+    }
+
+    @Test
     void 유효_로그_처리_중_발생한_오류는_숨기지_않는다() {
         var sinkFailure = new IllegalStateException("저장 실패");
 

@@ -9,6 +9,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.IntConsumer;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
@@ -54,6 +55,15 @@ public class JsonLinesParser {
      * 형식 오류가 확정되기 전에 전달된 행이 있을 수 있으므로, 저장하는 호출자가 해당 업로드의 행을 정리한다.
      */
     public ParseSummary parse(Reader source, Consumer<ParsedLog> onValidLog) throws IOException {
+        return parse(source, onValidLog, line -> { }, Integer.MAX_VALUE);
+    }
+
+    /**
+     * @param onLineRead 줄을 하나 읽을 때마다 지금까지 읽은 줄 수로 호출된다 (진행률 표시용)
+     * @param maxLines   이보다 줄이 많으면 더 읽지 않고 {@link ParseSummary#tooManyLines()}를 true로 돌려준다
+     */
+    public ParseSummary parse(Reader source, Consumer<ParsedLog> onValidLog, IntConsumer onLineRead, int maxLines)
+            throws IOException {
         BufferedReader lines = source instanceof BufferedReader buffered ? buffered : new BufferedReader(source);
         List<LineError> samples = new ArrayList<>(MAX_ERROR_SAMPLES);
         int processedLines = 0;
@@ -61,6 +71,9 @@ public class JsonLinesParser {
 
         String line;
         while ((line = lines.readLine()) != null) {
+            if (processedLines == maxLines) {
+                return new ParseSummary(processedLines, errorLines, samples, false, true);
+            }
             processedLines++;
             // Windows 메모장 등이 붙이는 UTF-8 BOM이 첫 줄 앞에 있으면 JSON 파싱이 실패하므로 지운다
             if (processedLines == 1 && !line.isEmpty() && line.charAt(0) == BOM) {
@@ -76,14 +89,15 @@ public class JsonLinesParser {
             if (log != null) {
                 onValidLog.accept(log);
             }
+            onLineRead.accept(processedLines);
             if (processedLines == FORMAT_SAMPLE_SIZE && reachesFormatErrorThreshold(errorLines, processedLines)) {
-                return new ParseSummary(processedLines, errorLines, samples, true);
+                return new ParseSummary(processedLines, errorLines, samples, true, false);
             }
         }
 
         boolean invalidFormat = processedLines == 0
                 || (processedLines < FORMAT_SAMPLE_SIZE && reachesFormatErrorThreshold(errorLines, processedLines));
-        return new ParseSummary(processedLines, errorLines, samples, invalidFormat);
+        return new ParseSummary(processedLines, errorLines, samples, invalidFormat, false);
     }
 
     private ParsedLog parseLine(String line) throws InvalidLine {
@@ -198,9 +212,18 @@ public class JsonLinesParser {
     public record LineError(int line, String reason) {
     }
 
-    public record ParseSummary(int processedLines, int errorLines, List<LineError> errorSamples, boolean invalidFormat) {
+    /**
+     * @param invalidFormat 처음 1,000줄(짧으면 전체) 중 90% 이상 실패했거나 빈 입력
+     * @param tooManyLines  maxLines를 넘는 줄이 있어 읽기를 멈췄다
+     */
+    public record ParseSummary(int processedLines, int errorLines, List<LineError> errorSamples,
+                               boolean invalidFormat, boolean tooManyLines) {
         public ParseSummary {
             errorSamples = List.copyOf(errorSamples);
+        }
+
+        public ParseSummary(int processedLines, int errorLines, List<LineError> errorSamples, boolean invalidFormat) {
+            this(processedLines, errorLines, errorSamples, invalidFormat, false);
         }
     }
 

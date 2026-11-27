@@ -318,6 +318,16 @@ erDiagram
   긴 문자열 컬럼(`cache_key` 512자)을 인덱스에 넣지 않아 utf8mb4 키 길이 한도(3072바이트) 문제를 피한다
 - `endpoint_policy`의 `UNIQUE (project_id, method, pattern)`으로 정책 중복을 DB에서 막는다
 - 업로드 1회 제한: 100MB(동기 검사, 413) / 100만 줄(파싱 중 검사, 초과 시 `FAILED`)
+- 업로드 처리 (B7)
+  - 요청 스레드: 소유자 확인 → 확장자 확인(415) → 파일을 임시 파일로 복사 → `log_upload`(UPLOADED) 저장 → 작업 큐에 넣고 202.
+    MultipartFile의 임시 파일은 요청이 끝나면 지워지므로 먼저 옮긴다. 업로드 행이 커밋된 뒤 작업을 넣어야 작업 스레드가 행을 본다
+  - 작업 스레드: PARSING → 파서로 한 줄씩 읽어 캐시 키·리소스 키를 만들고 1,000행씩 배치 insert, 10,000줄마다 `processed_lines` 갱신 →
+    PARSED(전체 줄 수·실패 줄·샘플·시간 범위) 또는 FAILED. 트랜잭션 없이 배치마다 커밋하고, 실패하면 적재한 행을 직접 지운다
+  - FAILED 사유: 형식 오류(처음 1,000줄 90% 실패), 100만 줄 초과, 분석 대상(GET 2xx) 0건, UTF-8이 아닌 파일, 그 밖의 오류
+  - 작업 큐가 가득 차면 업로드 행과 임시 파일을 지우고 503
+  - 서버가 파싱 도중 꺼지면 시작할 때 UPLOADED·PARSING 업로드를 FAILED로 바꾸고 적재한 행을 지운다 (v1은 서버 한 대 가정)
+  - 측정 (로컬 MacBook, MySQL 8.4 Docker): 20만 줄·24.7MB 파일을 0.2초에 접수, 약 6초에 파싱·저장 완료 (초당 약 3만 3천 줄)
+  - 설정: `app.upload.max-lines`(1,000,000), `insert-batch-size`(1,000), `progress-every-lines`(10,000)
 - 삭제: 프로젝트 삭제 시 요청 로그는 `upload_id` 단위로 1만 건씩 배치 삭제한다 (FK 연쇄 삭제에 의존하지 않음).
   파싱·분석이 진행 중인 프로젝트는 삭제할 수 없다 (409)
 - FK 규칙: `request_log → log_upload`만 CASCADE 없음(대량 연쇄 삭제 방지, 먼저 지우지 않으면 삭제 실패). 나머지 FK는 `ON DELETE CASCADE`
